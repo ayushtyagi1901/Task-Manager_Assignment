@@ -16,6 +16,7 @@ A production-ready demo app that helps users turn feature ideas into structured 
 - **Frontend**: React, TypeScript, Tailwind CSS, Shadcn UI, Framer Motion, dnd-kit.
 - **Backend**: Node.js, Express.
 - **Database**: PostgreSQL, Drizzle ORM.
+- **Authentication**: JWT-based authentication with bcrypt password hashing.
 - **AI**: Google Gemini API (gemini-1.5-pro).
 - **Build**: Vite.
 
@@ -28,26 +29,23 @@ A production-ready demo app that helps users turn feature ideas into structured 
 
 2. **Set up environment variables:**
    - Copy `.env.example` to `.env`
-   - Fill in your Supabase credentials (Database URL, Supabase URL, Anon Key, Service Role Key)
+   - Fill in your PostgreSQL database connection string
    - Add your Google Gemini API key
+   - Set a secure JWT secret key
    - See `.env.example` for details
 
 3. **Set up the database:**
    ```bash
    npm run db:push
    ```
-   This will create the necessary tables in your Supabase database.
+   This will create the necessary tables in your PostgreSQL database (users, specs, generated_outputs).
 
-4. **Enable Email Authentication in Supabase:**
-   - Go to Supabase Dashboard → Authentication → Providers
-   - Enable "Email" provider
-
-5. **Start the development server:**
+4. **Start the development server:**
    ```bash
    npm run dev
    ```
 
-6. **Open the app:**
+5. **Open the app:**
    - Navigate to `http://localhost:5000`
    - You'll be redirected to `/auth` to sign up or sign in
    - After authentication, you can start creating specs
@@ -60,10 +58,10 @@ A production-ready demo app that helps users turn feature ideas into structured 
 - ✅ Task Board with drag-and-drop reordering and grouping.
 - ✅ Markdown export (copy to clipboard and download).
 - ✅ Status page with real-time health checks for Backend, Database, and LLM.
-- ✅ User Authentication (Supabase Auth - sign up/login).
+- ✅ User Authentication (JWT-based sign up/login).
 - ✅ User-specific data isolation (users can only see their own specs).
 - ✅ Responsive UI with Dark Mode support (via Tailwind/Shadcn).
-- ✅ Persistent storage (PostgreSQL via Supabase).
+- ✅ Persistent storage (PostgreSQL).
 - ✅ Templates support (Web App, Mobile App, API Service, Internal Tool).
 - ✅ Risk/Unknowns section in spec form.
 - ✅ View last 5 generated specs.
@@ -77,18 +75,17 @@ A production-ready demo app that helps users turn feature ideas into structured 
 
 Required environment variables (see `.env.example` for template):
 
-- `DATABASE_URL` - PostgreSQL connection string (Supabase)
-- `VITE_SUPABASE_URL` - Supabase project URL (for frontend)
-- `VITE_SUPABASE_ANON_KEY` - Supabase anonymous/public key (for frontend)
-- `SUPABASE_URL` - Supabase project URL (for backend)
-- `SUPABASE_SERVICE_ROLE_KEY` - Supabase service role key (for backend auth verification)
+- `DATABASE_URL` - PostgreSQL connection string (e.g., `postgresql://user:password@host:port/database`)
+- `JWT_SECRET` - Secret key for JWT token signing (use a strong random string in production)
 - `GEMINI_API_KEY` - Google Gemini API key (get from [Google AI Studio](https://aistudio.google.com/apikey))
 - `PORT` - Server port (default: 5000)
 - `NODE_ENV` - Environment (development/production)
 
 ## Hosting
 
-This project can be easily deployed to Vercel, Railway, Render, or any Node.js hosting platform.
-- **Database**: Uses Supabase PostgreSQL
-- **Authentication**: Uses Supabase Auth
+This project can be easily deployed to Render, Railway, or any Node.js hosting platform.
+- **Database**: Uses PostgreSQL (Render PostgreSQL, Railway PostgreSQL, or any PostgreSQL provider)
+- **Authentication**: JWT-based authentication with secure password hashing
 - **AI**: Uses Google Gemini API
+
+For deployment instructions, see `DEPLOYMENT.md`.

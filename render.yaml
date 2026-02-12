@@ -9,5 +9,9 @@ services:
         value: production
       - key: PORT
         value: 5000
+      # Note: Set these in Render dashboard:
+      # - DATABASE_URL (PostgreSQL connection string)
+      # - JWT_SECRET (strong random string for JWT signing)
+      # - GEMINI_API_KEY (Google Gemini API key)
     healthCheckPath: /
 

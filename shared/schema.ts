@@ -1,13 +1,20 @@
-import { pgTable, text, serial, timestamp, jsonb, uuid } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { integer } from "drizzle-orm/pg-core";
 
 // === TABLE DEFINITIONS ===
 
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
+  email: text("email").notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const specs = pgTable("specs", {
   id: serial("id").primaryKey(),
-  userId: text("user_id").notNull(), // Supabase user UUID
+  userId: integer("user_id").notNull().references(() => users.id),
   title: text("title").notNull(),
   goal: text("goal").notNull(),
   targetUsers: text("target_users").notNull(),
@@ -42,10 +49,13 @@ export const generatedOutputs = pgTable("generated_outputs", {
 });
 
 // === BASE SCHEMAS ===
+export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
 export const insertSpecSchema = createInsertSchema(specs).omit({ id: true, createdAt: true, userId: true });
 export const insertGeneratedOutputSchema = createInsertSchema(generatedOutputs).omit({ id: true, createdAt: true });
 
 // === TYPES ===
+export type User = typeof users.$inferSelect;
+export type InsertUser = z.infer<typeof insertUserSchema>;
 export type Spec = typeof specs.$inferSelect;
 export type InsertSpec = z.infer<typeof insertSpecSchema>;
 
@@ -68,10 +78,4 @@ export interface StatusResponse {
   backend: boolean;
   database: boolean;
   llm: boolean;
-}
-
-// Auth types
-export interface User {
-  id: string;
-  email?: string;
 }

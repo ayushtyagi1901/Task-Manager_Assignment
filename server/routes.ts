@@ -4,20 +4,139 @@ import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { generatePlan, checkLLMHealth } from "./gemini";
 import { db } from "./db";
-import { sql } from "drizzle-orm";
+import { sql, eq } from "drizzle-orm";
 import { z } from "zod";
-import { getUserFromRequest } from "./auth";
+import bcrypt from "bcryptjs";
+import { getUserFromRequest, getUserFromSession, generateToken } from "./auth";
+import { users } from "@shared/schema";
+import { formatDatabaseError } from "./error-handler";
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
 
+  // === AUTH ROUTES ===
+
+  // Sign up
+  app.post("/api/auth/signup", async (req, res) => {
+    try {
+      const { email, password } = z.object({
+        email: z.string().email(),
+        password: z.string().min(6),
+      }).parse(req.body);
+
+      // Check if user already exists
+      const existingUser = await db.select().from(users).where(eq(users.email, email)).limit(1);
+      if (existingUser[0]) {
+        return res.status(400).json({ message: "User already exists" });
+      }
+
+      // Hash password
+      const passwordHash = await bcrypt.hash(password, 10);
+
+      // Create user
+      const [newUser] = await db.insert(users).values({
+        email,
+        passwordHash,
+      }).returning();
+
+      // Generate token
+      const token = generateToken(newUser.id, newUser.email);
+
+      // Set cookie
+      res.cookie("session_token", token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      });
+
+      res.status(201).json({
+        user: { id: newUser.id, email: newUser.email },
+        token,
+      });
+    } catch (err: any) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      // Check if it's a database error
+      if (err?.code?.startsWith("42") || err?.code?.startsWith("23") || err?.message?.includes("relation")) {
+        const { message, status } = formatDatabaseError(err);
+        return res.status(status).json({ message });
+      }
+      throw err;
+    }
+  });
+
+  // Sign in
+  app.post("/api/auth/signin", async (req, res) => {
+    try {
+      const { email, password } = z.object({
+        email: z.string().email(),
+        password: z.string(),
+      }).parse(req.body);
+
+      // Find user
+      const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
+      if (!user) {
+        return res.status(401).json({ message: "Invalid email or password" });
+      }
+
+      // Verify password
+      const isValid = await bcrypt.compare(password, user.passwordHash);
+      if (!isValid) {
+        return res.status(401).json({ message: "Invalid email or password" });
+      }
+
+      // Generate token
+      const token = generateToken(user.id, user.email);
+
+      // Set cookie
+      res.cookie("session_token", token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      });
+
+      res.json({
+        user: { id: user.id, email: user.email },
+        token,
+      });
+    } catch (err: any) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: err.errors[0].message });
+      }
+      // Check if it's a database error
+      if (err?.code?.startsWith("42") || err?.code?.startsWith("23") || err?.message?.includes("relation")) {
+        const { message, status } = formatDatabaseError(err);
+        return res.status(status).json({ message });
+      }
+      throw err;
+    }
+  });
+
+  // Sign out
+  app.post("/api/auth/signout", async (_req, res) => {
+    res.clearCookie("session_token");
+    res.json({ message: "Signed out successfully" });
+  });
+
+  // Get current user
+  app.get("/api/auth/me", async (req, res) => {
+    const user = await getUserFromRequest(req) || await getUserFromSession(req);
+    if (!user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    res.json({ id: user.id, email: user.email });
+  });
+
   // === API ROUTES ===
 
   // List recent specs
   app.get(api.specs.list.path, async (req, res) => {
-    const user = await getUserFromRequest(req);
+    const user = await getUserFromRequest(req) || await getUserFromSession(req);
     if (!user) {
       return res.status(401).json({ message: "Unauthorized" });
     }
@@ -27,7 +146,7 @@ export async function registerRoutes(
 
   // Create new spec
   app.post(api.specs.create.path, async (req, res) => {
-    const user = await getUserFromRequest(req);
+    const user = await getUserFromRequest(req) || await getUserFromSession(req);
     if (!user) {
       return res.status(401).json({ message: "Unauthorized" });
     }
@@ -49,7 +168,7 @@ export async function registerRoutes(
 
   // Get spec details
   app.get(api.specs.get.path, async (req, res) => {
-    const user = await getUserFromRequest(req);
+    const user = await getUserFromRequest(req) || await getUserFromSession(req);
     if (!user) {
       return res.status(401).json({ message: "Unauthorized" });
     }
@@ -65,7 +184,7 @@ export async function registerRoutes(
 
   // Generate plan (LLM)
   app.post(api.specs.generate.path, async (req, res) => {
-    const user = await getUserFromRequest(req);
+    const user = await getUserFromRequest(req) || await getUserFromSession(req);
     if (!user) {
       return res.status(401).json({ message: "Unauthorized" });
     }
@@ -103,7 +222,7 @@ export async function registerRoutes(
 
   // Update tasks (reorder/edit)
   app.patch(api.specs.updateTasks.path, async (req, res) => {
-    const user = await getUserFromRequest(req);
+    const user = await getUserFromRequest(req) || await getUserFromSession(req);
     if (!user) {
       return res.status(401).json({ message: "Unauthorized" });
     }

@@ -4,30 +4,30 @@ import { eq, desc, and } from "drizzle-orm";
 
 export interface IStorage {
   // Specs
-  createSpec(spec: InsertSpec, userId: string): Promise<Spec>;
-  getSpec(id: number, userId: string): Promise<Spec | undefined>;
-  getRecentSpecs(userId: string, limit?: number): Promise<Spec[]>;
+  createSpec(spec: InsertSpec, userId: number): Promise<Spec>;
+  getSpec(id: number, userId: number): Promise<Spec | undefined>;
+  getRecentSpecs(userId: number, limit?: number): Promise<Spec[]>;
   
   // Generated Outputs
   createGeneratedOutput(output: InsertGeneratedOutput): Promise<GeneratedOutput>;
-  getGeneratedOutputBySpecId(specId: number, userId: string): Promise<GeneratedOutput | undefined>;
-  updateGeneratedOutputTasks(id: number, tasks: any, userId: string): Promise<GeneratedOutput>;
+  getGeneratedOutputBySpecId(specId: number, userId: number): Promise<GeneratedOutput | undefined>;
+  updateGeneratedOutputTasks(id: number, tasks: any, userId: number): Promise<GeneratedOutput>;
 }
 
 export class DatabaseStorage implements IStorage {
-  async createSpec(spec: InsertSpec, userId: string): Promise<Spec> {
+  async createSpec(spec: InsertSpec, userId: number): Promise<Spec> {
     const [newSpec] = await db.insert(specs).values({ ...spec, userId }).returning();
     return newSpec;
   }
 
-  async getSpec(id: number, userId: string): Promise<Spec | undefined> {
+  async getSpec(id: number, userId: number): Promise<Spec | undefined> {
     const [spec] = await db.select().from(specs).where(
       and(eq(specs.id, id), eq(specs.userId, userId))
     );
     return spec;
   }
 
-  async getRecentSpecs(userId: string, limit: number = 5): Promise<Spec[]> {
+  async getRecentSpecs(userId: number, limit: number = 5): Promise<Spec[]> {
     return db.select().from(specs)
       .where(eq(specs.userId, userId))
       .orderBy(desc(specs.createdAt))
@@ -39,7 +39,7 @@ export class DatabaseStorage implements IStorage {
     return newOutput;
   }
 
-  async getGeneratedOutputBySpecId(specId: number, userId: string): Promise<GeneratedOutput | undefined> {
+  async getGeneratedOutputBySpecId(specId: number, userId: number): Promise<GeneratedOutput | undefined> {
     // First verify the spec belongs to the user
     const spec = await this.getSpec(specId, userId);
     if (!spec) {
@@ -51,7 +51,7 @@ export class DatabaseStorage implements IStorage {
     return output;
   }
 
-  async updateGeneratedOutputTasks(id: number, tasks: any, userId: string): Promise<GeneratedOutput> {
+  async updateGeneratedOutputTasks(id: number, tasks: any, userId: number): Promise<GeneratedOutput> {
     // Verify user owns the spec before updating
     const output = await this.getGeneratedOutputBySpecId(
       (await db.select().from(generatedOutputs).where(eq(generatedOutputs.id, id)))[0]?.specId || 0,

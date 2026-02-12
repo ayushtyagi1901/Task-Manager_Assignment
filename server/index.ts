@@ -1,8 +1,10 @@
 import "dotenv/config";
 import express, { type Request, Response, NextFunction } from "express";
+import cookieParser from "cookie-parser";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
+import { formatDatabaseError } from "./error-handler";
 
 const app = express();
 const httpServer = createServer(app);
@@ -22,6 +24,7 @@ app.use(
 );
 
 app.use(express.urlencoded({ extended: false }));
+app.use(cookieParser());
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
@@ -64,14 +67,28 @@ app.use((req, res, next) => {
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
+    if (res.headersSent) {
+      return next(err);
+    }
+
+    // Check if it's a database error
+    const isDatabaseError = err?.code?.startsWith("42") || 
+                           err?.code?.startsWith("23") || 
+                           err?.code?.startsWith("28") ||
+                           err?.message?.includes("relation") ||
+                           err?.message?.includes("does not exist") ||
+                           err?.message?.includes("database");
+
+    if (isDatabaseError) {
+      const { message, status } = formatDatabaseError(err);
+      console.error("Database Error:", err);
+      return res.status(status).json({ message });
+    }
+
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
     console.error("Internal Server Error:", err);
-
-    if (res.headersSent) {
-      return next(err);
-    }
 
     return res.status(status).json({ message });
   });

@@ -1,13 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl, type CreateSpecInput, type UpdateTasksInput } from "@shared/routes";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/lib/supabase";
 
-async function getAuthHeaders() {
-  const { data: { session } } = await supabase.auth.getSession();
+function getAuthHeaders() {
   return {
     "Content-Type": "application/json",
-    ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
   };
 }
 
